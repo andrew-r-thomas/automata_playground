@@ -1,16 +1,23 @@
 pub mod lenia_widget;
 
+use iced::widget::shader;
 use iced::Element;
+use iced::Length;
 use iced::Sandbox;
 use iced::Settings;
+use lenia_widget::LeniaProgram;
 
-struct Playground {}
+struct Playground {
+    lenia: LeniaProgram,
+}
 
 impl Sandbox for Playground {
     type Message = ();
 
     fn new() -> Self {
-        Self {}
+        Self {
+            lenia: LeniaProgram {},
+        }
     }
 
     fn title(&self) -> String {
@@ -22,7 +29,10 @@ impl Sandbox for Playground {
     }
 
     fn view(&self) -> Element<Self::Message> {
-        "Hello, world!".into()
+        shader(&self.lenia)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
     }
 }
 

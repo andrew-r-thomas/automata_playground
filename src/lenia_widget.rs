@@ -1,14 +1,14 @@
 use iced::{
     mouse,
     widget::shader::{
-        wgpu::{self, include_wgsl, util::DeviceExt},
+        wgpu::{self, include_wgsl, util::DeviceExt, Buffer, RenderPipeline},
         Primitive, Program,
     },
     Size,
 };
 
 #[derive(Debug)]
-struct LeniaPrimitive {}
+pub struct LeniaPrimitive {}
 
 impl Primitive for LeniaPrimitive {
     fn prepare(
@@ -21,7 +21,9 @@ impl Primitive for LeniaPrimitive {
         scale_factor: f32,
         storage: &mut iced::widget::shader::Storage,
     ) {
-        todo!()
+        if !storage.has::<LeniaPipeline>() {
+            storage.store(LeniaPipeline::new(device, queue, format, target_size));
+        }
     }
 
     fn render(
@@ -32,11 +34,13 @@ impl Primitive for LeniaPrimitive {
         viewport: iced::Rectangle<u32>,
         encoder: &mut iced::widget::shader::wgpu::CommandEncoder,
     ) {
-        todo!()
+        let pipeline = storage.get::<LeniaPipeline>().unwrap();
+
+        pipeline.render(encoder, target);
     }
 }
 
-struct LeniaProgram {}
+pub struct LeniaProgram {}
 
 impl<Message> Program<Message> for LeniaProgram {
     type State = ();
@@ -48,11 +52,14 @@ impl<Message> Program<Message> for LeniaProgram {
         cursor: mouse::Cursor,
         bounds: iced::Rectangle,
     ) -> Self::Primitive {
-        todo!();
+        Self::Primitive {}
     }
 }
 
-struct LeniaPipeline {}
+struct LeniaPipeline {
+    pipeline: RenderPipeline,
+    vertex_buffer: Buffer,
+}
 
 impl LeniaPipeline {
     pub fn new(
@@ -68,17 +75,76 @@ impl LeniaPipeline {
         });
 
         let shader = device.create_shader_module(include_wgsl!("shaders/triangle_shader.wgsl"));
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("pipeline layout"),
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
 
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("triangle pipeline"),
+            layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
             },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
         });
 
-        Self {}
+        Self {
+            pipeline,
+            vertex_buffer,
+        }
+    }
+
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder, target: &wgpu::TextureView) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &target,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
+        });
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        render_pass.draw(0..3, 0..1);
     }
 }
 
