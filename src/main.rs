@@ -1,3 +1,5 @@
+pub mod lenia_widget;
+
 use iced::Element;
 use iced::Sandbox;
 use iced::Settings;
