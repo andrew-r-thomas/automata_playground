@@ -3,6 +3,9 @@ name = "automata_playground"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["xtask", "iced_wgpu_rainbow_gain"]
+
 [dependencies]
 bytemuck = "1.15.0"
 iced = "0.12.1"
