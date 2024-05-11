@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["xtask", "iced_wgpu_rainbow_gain"]
+members = ["xtask", "iced_wgpu_rainbow_gain", "baseview_wgpu"]
 
 [dependencies]
 bytemuck = "1.15.0"
-iced = "0.12.1"
+iced_baseview = {git = "https://github.com/BillyDM/iced_baseview.git"}

@@ -117,13 +117,13 @@ impl Plugin for IcedWgpuRainbowGain {
         // allocate. You can remove this function if you do not need it.
     }
 
-    fn editor(&mut self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        editor::create(
-            self.params.clone(),
-            self.peak_meter.clone(),
-            self.params.editor_state.clone(),
-        )
-    }
+    // fn editor(&mut self, async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    //     editor::create(
+    //         self.params.clone(),
+    //         self.peak_meter.clone(),
+    //         self.params.editor_state.clone(),
+    //     )
+    // }
 
     fn process(
         &mut self,
