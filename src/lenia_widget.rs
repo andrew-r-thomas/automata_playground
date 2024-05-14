@@ -3,7 +3,7 @@ use iced::{
     widget::shader::{
         wgpu::{
             self, include_wgsl, BindGroupLayoutEntry, ComputePipeline, RenderPipeline,
-            ShaderStages, TextureFormat,
+            ShaderStages, StorageTextureAccess, Texture, TextureFormat,
         },
         Primitive, Program,
     },
@@ -64,6 +64,8 @@ struct LeniaPipeline {
     init_pipeline: ComputePipeline,
     update_pipeline: ComputePipeline,
     render_pipeline: RenderPipeline,
+    game_buff_a: Texture,
+    game_buff_b: Texture,
 }
 
 impl LeniaPipeline {
@@ -116,7 +118,22 @@ impl LeniaPipeline {
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            // TODO
+            label: Some("lenia render"),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "render_vs",
+                buffers: &[],
+            },
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "render_fs",
+                targets: &[],
+            }),
+            multiview: None,
         });
 
         Self {
@@ -136,6 +153,12 @@ impl LeniaPipeline {
             timestamp_writes: None,
         });
         pass.set_pipeline(&self.update_pipeline);
+        todo!()
+    }
+
+    pub fn render(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor::default());
+        pass.set_pipeline(&self.render_pipeline);
         todo!()
     }
 }
