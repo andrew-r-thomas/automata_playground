@@ -1,186 +1,145 @@
-// use iced::{
-//     mouse,
-//     widget::shader::{
-//         wgpu::{self, include_wgsl, util::DeviceExt, Buffer, RenderPipeline},
-//         Primitive, Program,
-//     },
-//     Size,
-// };
+use iced::{
+    mouse,
+    widget::shader::{
+        wgpu::{
+            self, include_wgsl, BindGroupLayoutEntry, ComputePipeline, RenderPipeline,
+            ShaderStages, TextureFormat,
+        },
+        Primitive, Program,
+    },
+};
 
-// #[derive(Debug)]
-// pub struct LeniaPrimitive {}
+#[derive(Debug)]
+pub struct LeniaPrimitive {}
 
-// impl Primitive for LeniaPrimitive {
-//     fn prepare(
-//         &self,
-//         format: iced::widget::shader::wgpu::TextureFormat,
-//         device: &iced::widget::shader::wgpu::Device,
-//         queue: &iced::widget::shader::wgpu::Queue,
-//         bounds: iced::Rectangle,
-//         target_size: iced::Size<u32>,
-//         scale_factor: f32,
-//         storage: &mut iced::widget::shader::Storage,
-//     ) {
-//         if !storage.has::<LeniaPipeline>() {
-//             storage.store(LeniaPipeline::new(device, queue, format, target_size));
-//         }
-//     }
+impl Primitive for LeniaPrimitive {
+    fn prepare(
+        &self,
+        format: iced::widget::shader::wgpu::TextureFormat,
+        device: &iced::widget::shader::wgpu::Device,
+        queue: &iced::widget::shader::wgpu::Queue,
+        _bounds: iced::Rectangle,
+        target_size: iced::Size<u32>,
+        _scale_factor: f32,
+        storage: &mut iced::widget::shader::Storage,
+    ) {
+        if !storage.has::<LeniaPipeline>() {
+            storage.store(LeniaPipeline::new(device, queue, format));
+        }
+        todo!()
+        // put the pipepline in here for setting up the random board etc
+    }
 
-//     fn render(
-//         &self,
-//         storage: &iced::widget::shader::Storage,
-//         target: &iced::widget::shader::wgpu::TextureView,
-//         target_size: iced::Size<u32>,
-//         viewport: iced::Rectangle<u32>,
-//         encoder: &mut iced::widget::shader::wgpu::CommandEncoder,
-//     ) {
-//         let pipeline = storage.get::<LeniaPipeline>().unwrap();
+    fn render(
+        &self,
+        storage: &iced::widget::shader::Storage,
+        target: &iced::widget::shader::wgpu::TextureView,
+        _target_size: iced::Size<u32>,
+        _viewport: iced::Rectangle<u32>,
+        encoder: &mut iced::widget::shader::wgpu::CommandEncoder,
+    ) {
+        let lenia_compute = storage.get::<LeniaPipeline>().unwrap();
+        lenia_compute.calc_step(encoder);
+        todo!()
+    }
+}
 
-//         pipeline.render(encoder, target);
-//     }
-// }
+pub struct LeniaProgram {}
 
-// pub struct LeniaProgram {}
+impl<Message> Program<Message> for LeniaProgram {
+    type State = ();
+    type Primitive = LeniaPrimitive;
 
-// impl<Message> Program<Message> for LeniaProgram {
-//     type State = ();
-//     type Primitive = LeniaPrimitive;
+    fn draw(
+        &self,
+        _state: &Self::State,
+        _cursor: mouse::Cursor,
+        _bounds: iced::Rectangle,
+    ) -> Self::Primitive {
+        Self::Primitive {}
+    }
+}
 
-//     fn draw(
-//         &self,
-//         state: &Self::State,
-//         cursor: mouse::Cursor,
-//         bounds: iced::Rectangle,
-//     ) -> Self::Primitive {
-//         Self::Primitive {}
-//     }
-// }
+struct LeniaPipeline {
+    init_pipeline: ComputePipeline,
+    update_pipeline: ComputePipeline,
+    render_pipeline: RenderPipeline,
+}
 
-// struct LeniaPipeline {
-//     pipeline: RenderPipeline,
-//     vertex_buffer: Buffer,
-// }
+impl LeniaPipeline {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Self {
+        let shader = device.create_shader_module(include_wgsl!("shaders/lenia.wgsl"));
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::ReadOnly,
+                        format: TextureFormat::R32Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::COMPUTE | ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::ReadWrite,
+                        format: TextureFormat::R32Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+            ],
+        });
 
-// impl LeniaPipeline {
-//     pub fn new(
-//         device: &wgpu::Device,
-//         queue: &wgpu::Queue,
-//         format: wgpu::TextureFormat,
-//         target_size: Size<u32>,
-//     ) -> Self {
-//         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-//             label: Some("Vertex Buffer"),
-//             contents: bytemuck::cast_slice(VERTICES),
-//             usage: wgpu::BufferUsages::VERTEX,
-//         });
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("pipeline layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
 
-//         let shader = device.create_shader_module(include_wgsl!("shaders/triangle_shader.wgsl"));
-//         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-//             label: Some("pipeline layout"),
-//             bind_group_layouts: &[],
-//             push_constant_ranges: &[],
-//         });
+        let init_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("lenia init"),
+            layout: Some(&layout),
+            module: &shader,
+            entry_point: "init",
+        });
 
-//         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-//             label: Some("triangle pipeline"),
-//             layout: Some(&layout),
-//             vertex: wgpu::VertexState {
-//                 module: &shader,
-//                 entry_point: "vs_main",
-//                 buffers: &[Vertex::desc()],
-//             },
-//             fragment: Some(wgpu::FragmentState {
-//                 module: &shader,
-//                 entry_point: "fs_main",
-//                 targets: &[Some(wgpu::ColorTargetState {
-//                     format,
-//                     blend: Some(wgpu::BlendState::REPLACE),
-//                     write_mask: wgpu::ColorWrites::ALL,
-//                 })],
-//             }),
-//             primitive: wgpu::PrimitiveState {
-//                 topology: wgpu::PrimitiveTopology::TriangleList,
-//                 strip_index_format: None,
-//                 front_face: wgpu::FrontFace::Ccw,
-//                 cull_mode: Some(wgpu::Face::Back),
-//                 polygon_mode: wgpu::PolygonMode::Fill,
-//                 unclipped_depth: false,
-//                 conservative: false,
-//             },
-//             depth_stencil: None,
-//             multisample: wgpu::MultisampleState {
-//                 count: 1,
-//                 mask: !0,
-//                 alpha_to_coverage_enabled: false,
-//             },
-//             multiview: None,
-//         });
+        let update_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("lenia compute"),
+            layout: Some(&layout),
+            module: &shader,
+            entry_point: "update",
+        });
 
-//         Self {
-//             pipeline,
-//             vertex_buffer,
-//         }
-//     }
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            // TODO
+        });
 
-//     pub fn render(&self, encoder: &mut wgpu::CommandEncoder, target: &wgpu::TextureView) {
-//         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-//             label: Some("Render Pass"),
-//             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-//                 view: &target,
-//                 resolve_target: None,
-//                 ops: wgpu::Operations {
-//                     load: wgpu::LoadOp::Clear(wgpu::Color {
-//                         r: 0.1,
-//                         g: 0.2,
-//                         b: 0.3,
-//                         a: 1.0,
-//                     }),
-//                     store: wgpu::StoreOp::Store,
-//                 },
-//             })],
-//             depth_stencil_attachment: None,
-//             occlusion_query_set: None,
-//             timestamp_writes: None,
-//         });
-//         render_pass.set_pipeline(&self.pipeline);
-//         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-//         render_pass.draw(0..3, 0..1);
-//     }
-// }
+        Self {
+            update_pipeline,
+            init_pipeline,
+            render_pipeline,
+        }
+    }
 
-// #[repr(C)]
-// #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-// struct Vertex {
-//     position: [f32; 3],
-//     color: [f32; 3],
-// }
+    pub fn setup_board() {
+        todo!()
+    }
 
-// const VERTICES: &[Vertex] = &[
-//     Vertex {
-//         position: [0.0, 0.5, 0.0],
-//         color: [1.0, 0.0, 0.0],
-//     },
-//     Vertex {
-//         position: [-0.5, -0.5, 0.0],
-//         color: [0.0, 1.0, 0.0],
-//     },
-//     Vertex {
-//         position: [0.5, -0.5, 0.0],
-//         color: [0.0, 0.0, 1.0],
-//     },
-// ];
+    pub fn calc_step(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: None,
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&self.update_pipeline);
+        todo!()
+    }
+}
 
-// impl Vertex {
-//     const ATTRIBS: [wgpu::VertexAttribute; 2] =
-//         wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+struct LeniaRender {}
 
-//     fn desc() -> wgpu::VertexBufferLayout<'static> {
-//         use std::mem;
-
-//         wgpu::VertexBufferLayout {
-//             array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
-//             step_mode: wgpu::VertexStepMode::Vertex,
-//             attributes: &Self::ATTRIBS,
-//         }
-//     }
-// }
+impl LeniaRender {}
