@@ -2,8 +2,11 @@ use iced::{
     mouse,
     widget::shader::{
         wgpu::{
-            self, include_wgsl, BindGroupLayoutEntry, ComputePipeline, RenderPipeline,
-            ShaderStages, StorageTextureAccess, Texture, TextureFormat,
+            self, include_wgsl,
+            util::{BufferInitDescriptor, DeviceExt},
+            BindGroupDescriptor, BindGroupEntry, BindGroupLayoutEntry, BindingResource,
+            BufferUsages, ComputePipeline, RenderPipeline, ShaderStages, Texture,
+            TextureDescriptor, TextureFormat, TextureUsages, TextureViewDescriptor,
         },
         Primitive, Program,
     },
@@ -40,6 +43,7 @@ impl Primitive for LeniaPrimitive {
     ) {
         let lenia_compute = storage.get::<LeniaPipeline>().unwrap();
         lenia_compute.calc_step(encoder);
+
         todo!()
     }
 }
@@ -76,9 +80,9 @@ impl LeniaPipeline {
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::COMPUTE,
+                    visibility: ShaderStages::COMPUTE | ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::StorageTexture {
-                        access: wgpu::StorageTextureAccess::ReadOnly,
+                        access: wgpu::StorageTextureAccess::ReadWrite,
                         format: TextureFormat::R32Float,
                         view_dimension: wgpu::TextureViewDimension::D2,
                     },
@@ -93,6 +97,85 @@ impl LeniaPipeline {
                         view_dimension: wgpu::TextureViewDimension::D2,
                     },
                     count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::COMPUTE | ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        let game_buff_a = device.create_texture(&TextureDescriptor {
+            label: Some("game buff a"),
+            size: wgpu::Extent3d {
+                width: 512,
+                height: 512,
+                depth_or_array_layers: 0,
+            },
+            mip_level_count: 0,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: TextureFormat::R32Float,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let game_buff_b = device.create_texture(&TextureDescriptor {
+            label: Some("game buff b"),
+            size: wgpu::Extent3d {
+                width: 512,
+                height: 512,
+                depth_or_array_layers: 0,
+            },
+            mip_level_count: 0,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: TextureFormat::R32Float,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        let game_view_a = game_buff_a.create_view(&TextureViewDescriptor {
+            label: Some("game view a"),
+            format: Some(TextureFormat::R32Float),
+            base_mip_level: 0,
+            mip_level_count: Some(1),
+            ..Default::default()
+        });
+        let game_view_b = game_buff_b.create_view(&TextureViewDescriptor {
+            label: Some("game view a"),
+            format: Some(TextureFormat::R32Float),
+            base_mip_level: 0,
+            mip_level_count: Some(1),
+            ..Default::default()
+        });
+
+        let input_view_buff = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("which is input"),
+            contents: bytemuck::cast_slice(&[0]),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("storage bind group"),
+            layout: &bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::TextureView(&game_view_a),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(&game_view_b),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: input_view_buff.as_entire_binding(),
                 },
             ],
         });
@@ -140,6 +223,8 @@ impl LeniaPipeline {
             update_pipeline,
             init_pipeline,
             render_pipeline,
+            game_buff_a,
+            game_buff_b,
         }
     }
 
@@ -157,8 +242,13 @@ impl LeniaPipeline {
     }
 
     pub fn render(&self, encoder: &mut wgpu::CommandEncoder) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor::default());
-        pass.set_pipeline(&self.render_pipeline);
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor::default());
+            pass.set_pipeline(&self.render_pipeline);
+            let view = self
+                .game_buff_a
+                .create_view(&TextureViewDescriptor::default());
+        }
         todo!()
     }
 }
